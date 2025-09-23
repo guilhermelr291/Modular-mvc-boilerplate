@@ -1,25 +1,43 @@
-import { Express, Router } from 'express';
-import { readdirSync } from 'fs';
+import { Router } from 'express';
+import { readdirSync, Dirent } from 'fs';
 import { join } from 'path';
+import { Application } from 'express';
 
-export default (app: Express) => {
-  const router = Router();
-  app.use('/api', router);
+export default (app: Application) => {
+    const router = Router();
+    app.use('/api', router);
 
-  const modulesPath = join(__dirname, '../modules');
+    const modulesPath = join(__dirname, '../modules');
 
-  const loadRoutes = (dir: string) => {
-    readdirSync(dir, { withFileTypes: true }).forEach(async file => {
-      const fullPath = join(dir, file.name);
+    const loadRoutes = (dir: string) => {
+       
+        
+        try {
+            const files: Dirent[] = readdirSync(dir, { withFileTypes: true });
+           
+            
+            files.forEach(async (file: Dirent) => {
+                const fullPath = join(dir, file.name);
+               
+                
+                if (file.isDirectory()) {
+                    console.log(`📁 Entrando no diretório: ${fullPath}`);
+                    loadRoutes(fullPath);
+                } else if (file.name.endsWith('routes.ts') || file.name.endsWith('routes.js')) {
+                   
+                    try {
+                        const routeModule = await import(fullPath);
+                        routeModule.default(router);
+                       
+                    } catch (error) {
+                        console.error(`❌ Erro ao importar: ${fullPath}`, error);
+                    }
+                }
+            });
+        } catch (error) {
+            console.error(`💥 ERRO CRÍTICO ao ler diretório ${dir}:`, error);
+        }
+    };
 
-      if (file.isDirectory()) {
-        loadRoutes(fullPath);
-      } else if (file.name.endsWith('routes.ts')) {
-        console.log(`Importando rotas de: ${fullPath}`);
-        (await import(fullPath)).default(router);
-      }
-    });
-  };
-
-  loadRoutes(modulesPath);
+    loadRoutes(modulesPath);
 };
