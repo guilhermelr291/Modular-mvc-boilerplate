@@ -22,5 +22,8 @@ Cada módulo possui suas próprias responsabilidades, garantindo **isolamento de
 
 ## 🧱 Arquitetura Modular MVC
 
-A estrutura segue o padrão **Model-View-Controller**, dividindo responsabilidades de forma clara:
+A estrutura segue o padrão **Model-View-Controller**, dividindo responsabilidades de forma clara. 
+Essa modularização facilita a escalabilidade, a reutilização de código e o isolamento de funcionalidades.
+
+---
 
