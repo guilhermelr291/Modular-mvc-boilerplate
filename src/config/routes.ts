@@ -20,8 +20,7 @@ export default (app: Application) => {
                 const fullPath = join(dir, file.name);
                
                 
-                if (file.isDirectory()) {
-                    console.log(`📁 Entrando no diretório: ${fullPath}`);
+                if (file.isDirectory()) {                
                     loadRoutes(fullPath);
                 } else if (file.name.endsWith('routes.ts') || file.name.endsWith('routes.js')) {
                    
