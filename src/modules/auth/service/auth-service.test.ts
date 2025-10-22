@@ -1,15 +1,16 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { UserRepository } from '../../user/repository/user-repository';
-import { BcryptAdapter } from '../../../common/adapters/cryptography/bcrypt-adapter';
 
 import { AuthService, LoginParams, SignUpParams } from './auth-service';
 import { User } from '@prisma/client';
-import { JwtAdapter } from '../../../common/adapters/cryptography/jwt-adapter';
+
 import { UnauthorizedError } from '../../../common/errors/http-errors';
 import { Hasher } from '../protocols/hasher';
 import { HashComparer } from '../protocols/hash-comparer';
 import { Encrypter } from '../protocols/encrypter';
 import { RefreshTokenGenerator } from '../protocols/refresh-token-generator';
+import { Decrypter } from '../protocols/decrypter';
+import { Decoder } from '../protocols/decoder';
 
 const mockSignUpParams = (): SignUpParams => ({
   email: 'any_email@mail.com',
@@ -56,9 +57,20 @@ class EncrypterStub implements Encrypter {
   }
 }
 
+class DecrypterStub implements Decrypter {
+  decrypt(token: string, secret?: string) {
+    return 'decrypted_value';
+  }
+}
+class DecoderStub implements Decoder {
+  decode(token: string) {
+    return 'decoded_value';
+  }
+}
+
 class RefreshTokenGeneratorStub implements RefreshTokenGenerator {
   generate(): string {
-    return 'another_encoded_value';
+    return 'refresh_token';
   }
 }
 
@@ -67,6 +79,8 @@ describe('AuthService', () => {
   let hashComparerStub: HashComparer;
   let hasherStub: Hasher;
   let encrypterStub: Encrypter;
+  let decrypterStub: Decrypter;
+  let decoderStub: Decoder;
   let refreshTokenGeneratorStub = new RefreshTokenGeneratorStub();
 
   beforeEach(() => {
@@ -75,13 +89,17 @@ describe('AuthService', () => {
     hashComparerStub = new HashComparerStub();
     encrypterStub = new EncrypterStub();
     hasherStub = new HasherStub();
+    decoderStub = new DecoderStub();
+    decrypterStub = new DecrypterStub();
 
     sut = new AuthService(
       mockUserRepository,
       hasherStub,
       hashComparerStub,
       encrypterStub,
-      refreshTokenGeneratorStub
+      refreshTokenGeneratorStub,
+      decoderStub,
+      decrypterStub
     );
   });
 
@@ -194,18 +212,60 @@ describe('AuthService', () => {
       expect(encodeSpy).toHaveBeenCalledWith({ id: mockUserModel().id });
     });
 
+    test('Should call RefreshTokenGenerator', async () => {
+      const refreshTokenGeneratorSpy = vi.spyOn(
+        refreshTokenGeneratorStub,
+        'generate'
+      );
+
+      await sut.login(mockLoginParams());
+
+      expect(refreshTokenGeneratorSpy).toHaveBeenCalled();
+    });
+
+    test('Should throw if RefreshTokenGenerator throws', async () => {
+      vi.spyOn(refreshTokenGeneratorStub, 'generate').mockImplementationOnce(
+        () => {
+          throw new Error();
+        }
+      );
+
+      expect(sut.login(mockLoginParams())).rejects.toThrow();
+    });
+
     test('Should return accessToken, refreshToken and user on success', async () => {
       const result = await sut.login(mockLoginParams());
 
       expect(result).toStrictEqual({
         accessToken: 'encoded_value',
-        refreshToken: 'another_encoded_value',
+        refreshToken: 'refresh_token',
         user: {
           id: 1,
           email: 'any_email',
           name: 'any_name',
         },
       });
+    });
+
+    test('Should call userRepository.saveRefreshToken with correct values', async () => {
+      const saveRefreshTokenSpy = vi.spyOn(
+        mockUserRepository,
+        'saveRefreshToken'
+      );
+
+      await sut.login(mockLoginParams());
+
+      expect(saveRefreshTokenSpy).toHaveBeenCalledWith('refresh_token', 1);
+    });
+
+    test('Should throw if  userRepository.saveRefreshToken throws', async () => {
+      vi.spyOn(mockUserRepository, 'saveRefreshToken').mockImplementationOnce(
+        () => {
+          throw new Error();
+        }
+      );
+
+      expect(sut.login(mockLoginParams())).rejects.toThrow();
     });
 
     test('Should throw if HashComparer throws', async () => {
