@@ -11,6 +11,12 @@ const mockAuthService = {
     token: 'any_token',
     user: { id: 1, name: 'any_name', email: 'any_email' },
   }),
+  refreshAccessToken: vi.fn().mockResolvedValue({
+    accessToken: 'new_access_token',
+    refreshToken: 'new_refresh_token',
+  }),
+  requestPasswordReset: vi.fn().mockResolvedValue(undefined),
+  resetPassword: vi.fn().mockResolvedValue(undefined),
 } as unknown as AuthService;
 
 class FieldComparerStub implements FieldComparer {
@@ -135,6 +141,7 @@ describe('AuthController', () => {
 
       expect(loginSpy).toHaveBeenCalledWith(mockRequest.body);
     });
+
     test('Should call next if AuthService.login throws', async () => {
       const error = new Error();
 
@@ -163,6 +170,185 @@ describe('AuthController', () => {
         token: 'any_token',
         user: { id: 1, name: 'any_name', email: 'any_email' },
       });
+    });
+  });
+
+  describe('refreshAccessToken', () => {
+    beforeEach(() => {
+      mockRequest = {
+        body: {
+          refreshToken: 'valid_refresh_token',
+        },
+      };
+    });
+
+    test('Should call AuthService.refreshAccessToken with correct value', async () => {
+      const refreshSpy = vi.spyOn(mockAuthService, 'refreshAccessToken');
+
+      await sut.refreshAccessToken(
+        mockRequest as Request,
+        mockResponse as Response,
+        mockNext
+      );
+
+      expect(refreshSpy).toHaveBeenCalledWith('valid_refresh_token');
+    });
+
+    test('Should return status 200 and tokens on success', async () => {
+      await sut.refreshAccessToken(
+        mockRequest as Request,
+        mockResponse as Response,
+        mockNext
+      );
+
+      expect(mockResponse.status).toHaveBeenCalledWith(200);
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        accessToken: 'new_access_token',
+        refreshToken: 'new_refresh_token',
+      });
+    });
+
+    test('Should call next if refreshToken is not provided', async () => {
+      mockRequest.body = {};
+
+      await sut.refreshAccessToken(
+        mockRequest as Request,
+        mockResponse as Response,
+        mockNext
+      );
+
+      expect(mockNext).toHaveBeenCalled();
+      expect(mockNext).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'Refresh token not provided',
+        })
+      );
+    });
+
+    test('Should call next if AuthService.refreshAccessToken throws', async () => {
+      const error = new Error();
+
+      vi.spyOn(mockAuthService, 'refreshAccessToken').mockImplementationOnce(
+        () => {
+          throw error;
+        }
+      );
+
+      await sut.refreshAccessToken(
+        mockRequest as Request,
+        mockResponse as Response,
+        mockNext
+      );
+
+      expect(mockNext).toHaveBeenCalledWith(error);
+    });
+  });
+
+  describe('requestPasswordReset', () => {
+    beforeEach(() => {
+      mockRequest = {
+        body: {
+          email: 'any_email@mail.com',
+        },
+      };
+    });
+
+    test('Should call AuthService.requestPasswordReset with correct email', async () => {
+      const requestSpy = vi.spyOn(mockAuthService, 'requestPasswordReset');
+
+      await sut.requestPasswordReset(
+        mockRequest as Request,
+        mockResponse as Response,
+        mockNext
+      );
+
+      expect(requestSpy).toHaveBeenCalledWith('any_email@mail.com');
+    });
+
+    test('Should return status 200 and success message', async () => {
+      await sut.requestPasswordReset(
+        mockRequest as Request,
+        mockResponse as Response,
+        mockNext
+      );
+
+      expect(mockResponse.status).toHaveBeenCalledWith(200);
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        message: 'Email de recuperação enviado com sucesso!',
+      });
+    });
+
+    test('Should call next if AuthService.requestPasswordReset throws', async () => {
+      const error = new Error();
+
+      vi.spyOn(mockAuthService, 'requestPasswordReset').mockImplementationOnce(
+        () => {
+          throw error;
+        }
+      );
+
+      await sut.requestPasswordReset(
+        mockRequest as Request,
+        mockResponse as Response,
+        mockNext
+      );
+
+      expect(mockNext).toHaveBeenCalledWith(error);
+    });
+  });
+
+  describe('resetPassword', () => {
+    beforeEach(() => {
+      mockRequest = {
+        body: {
+          token: 'valid_reset_token',
+          newPassword: 'new_password',
+        },
+      };
+    });
+
+    test('Should call AuthService.resetPassword with correct values', async () => {
+      const resetSpy = vi.spyOn(mockAuthService, 'resetPassword');
+
+      await sut.resetPassword(
+        mockRequest as Request,
+        mockResponse as Response,
+        mockNext
+      );
+
+      expect(resetSpy).toHaveBeenCalledWith(
+        'valid_reset_token',
+        'new_password'
+      );
+    });
+
+    test('Should return status 200 and success message', async () => {
+      await sut.resetPassword(
+        mockRequest as Request,
+        mockResponse as Response,
+        mockNext
+      );
+
+      expect(mockResponse.status).toHaveBeenCalledWith(200);
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        message: 'Senha alterada com sucesso!',
+      });
+    });
+
+    test('Should call next if AuthService.resetPassword throws', async () => {
+      const error = new Error();
+
+      vi.spyOn(mockAuthService, 'resetPassword').mockImplementationOnce(() => {
+        throw error;
+      });
+
+      await sut.resetPassword(
+        mockRequest as Request,
+        mockResponse as Response,
+        mockNext
+      );
+
+      expect(mockNext).toHaveBeenCalledWith(error);
     });
   });
 });
