@@ -23,6 +23,8 @@ const mockLoginParams = (): LoginParams => ({
   password: 'any_password',
 });
 
+const mockRefreshAccessTokenParams = 'refresh_token';
+
 const mockUserModel = (): User => ({
   id: 1,
   email: 'any_email',
@@ -34,7 +36,14 @@ const mockUserRepository = {
   getByEmail: vi.fn(),
   create: vi.fn(),
   saveRefreshToken: vi.fn(),
-  getRefreshTokenWithUser: vi.fn(),
+  getRefreshTokenWithUser: vi.fn().mockResolvedValue({
+    id: 1,
+    revoked: false,
+    expiresAt: new Date('9999-12-31T23:59:59.999Z'),
+    user: {
+      id: 1,
+    },
+  }),
   deleteRefreshToken: vi.fn(),
   revokeAllUserRefreshTokens: vi.fn(),
 } as unknown as UserRepository;
@@ -53,7 +62,7 @@ class HashComparerStub implements HashComparer {
 
 class EncrypterStub implements Encrypter {
   encrypt(data: {}): string {
-    return 'encoded_value';
+    return 'encrypted_value';
   }
 }
 
@@ -237,7 +246,7 @@ describe('AuthService', () => {
       const result = await sut.login(mockLoginParams());
 
       expect(result).toStrictEqual({
-        accessToken: 'encoded_value',
+        accessToken: 'encrypted_value',
         refreshToken: 'refresh_token',
         user: {
           id: 1,
@@ -288,6 +297,91 @@ describe('AuthService', () => {
       });
 
       expect(sut.login(mockLoginParams())).rejects.toThrow();
+    });
+  });
+
+  describe('refreshAccessToken', () => {
+    test('Should call userRepository.getRefreshTokenWithUser with correct value', async () => {
+      const getRefreshTokenWithUserSpy = vi.spyOn(
+        mockUserRepository,
+        'getRefreshTokenWithUser'
+      );
+
+      await sut.refreshAccessToken(mockRefreshAccessTokenParams);
+
+      expect(getRefreshTokenWithUserSpy).toHaveBeenCalledWith(
+        mockRefreshAccessTokenParams
+      );
+    });
+
+    test('Should call userRepository.getRefreshTokenWithUser with correct value', async () => {
+      const getRefreshTokenWithUserSpy = vi.spyOn(
+        mockUserRepository,
+        'getRefreshTokenWithUser'
+      );
+
+      await sut.refreshAccessToken(mockRefreshAccessTokenParams);
+
+      expect(getRefreshTokenWithUserSpy).toHaveBeenCalledWith(
+        mockRefreshAccessTokenParams
+      );
+    });
+
+    test('Should throw UnauthorizedError if token is not found or revoked', async () => {
+      vi.spyOn(
+        mockUserRepository,
+        'getRefreshTokenWithUser'
+      ).mockResolvedValueOnce(null);
+
+      await expect(
+        sut.refreshAccessToken(mockRefreshAccessTokenParams)
+      ).rejects.toThrow(UnauthorizedError);
+    });
+
+    test('Should throw UnauthorizedError if token is expired', async () => {
+      vi.spyOn(
+        mockUserRepository,
+        'getRefreshTokenWithUser'
+      ).mockResolvedValueOnce({
+        id: 1,
+        revoked: false,
+        expiresAt: new Date('2000-01-01T00:00:00.000Z'),
+        user: {
+          id: 1,
+        },
+      });
+      await expect(
+        sut.refreshAccessToken(mockRefreshAccessTokenParams)
+      ).rejects.toThrow(UnauthorizedError);
+    });
+
+    test('Should call userRepository.revokeAllUserRefreshTokens with correct value', async () => {
+      const revokeAllUserRefreshTokensSpy = vi.spyOn(
+        mockUserRepository,
+        'revokeAllUserRefreshTokens'
+      );
+      await sut.refreshAccessToken(mockRefreshAccessTokenParams);
+
+      expect(revokeAllUserRefreshTokensSpy).toHaveBeenCalledWith(1);
+    });
+    test('Should call Encrypter with correct value', async () => {
+      const encryptSpy = vi.spyOn(encrypterStub, 'encrypt');
+
+      await sut.refreshAccessToken(mockRefreshAccessTokenParams);
+      expect(encryptSpy).toHaveBeenCalledWith({ id: 1 });
+    });
+    test('Should call RefreshTokenGenerator', async () => {
+      const generateSpy = vi.spyOn(refreshTokenGeneratorStub, 'generate');
+
+      await sut.refreshAccessToken(mockRefreshAccessTokenParams);
+      expect(generateSpy).toHaveBeenCalled();
+    });
+    test('Should return accessToken and refreshToken on success', async () => {
+      const result = await sut.refreshAccessToken(mockRefreshAccessTokenParams);
+      expect(result).toEqual({
+        accessToken: 'encrypted_value',
+        refreshToken: 'refresh_token',
+      });
     });
   });
 });
