@@ -5,6 +5,7 @@ vi.mock('bcrypt', () => ({
   default: {
     hash: vi.fn().mockResolvedValue('hashed_value'),
     genSalt: vi.fn().mockResolvedValue('any_salt'),
+    compare: vi.fn().mockResolvedValue(true),
   },
 }));
 
@@ -34,6 +35,31 @@ describe('BcryptAdapter', () => {
       const result = await sut.hash('any_value');
 
       expect(result).toBe('hashed_value');
+    });
+  });
+
+  describe('compare', () => {
+    test('Should call bcrypt compare method with correct values', async () => {
+      const compareSpy = vi.spyOn(bcrypt, 'compare');
+      await sut.compare('any_value', 'any_value_to_compare');
+      expect(compareSpy).toHaveBeenCalledWith(
+        'any_value',
+        'any_value_to_compare'
+      );
+    });
+    test('Should return true when values match', async () => {
+      const result = await sut.compare('any_value', 'any_value');
+
+      expect(result).toBe(true);
+    });
+
+    test('Should throw if bcrypt compare throws', async () => {
+      vi.mocked(bcrypt.compare).mockImplementationOnce(() => {
+        throw new Error();
+      });
+      expect(
+        async () => await sut.compare('any_value', 'any_value')
+      ).rejects.toThrow();
     });
   });
 });
