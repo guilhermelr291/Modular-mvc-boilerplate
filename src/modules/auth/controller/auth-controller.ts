@@ -59,4 +59,32 @@ export class AuthController {
       next(error);
     }
   }
+
+  async requestPasswordReset(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { email } = req.body;
+
+      await this.authService.requestPasswordReset(email);
+
+      res
+        .status(200)
+        .json({ message: 'Email de recuperação enviado com sucesso!' });
+    } catch (error) {
+      console.log('Erro ao solicitar recuperação de senha: ', error);
+      next(error);
+    }
+  }
+
+  async resetPassword(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { token, newPassword } = req.body;
+
+      await this.authService.resetPassword(token, newPassword);
+
+      res.status(200).json({ message: 'Senha alterada com sucesso!' });
+    } catch (error) {
+      console.log('Erro ao resetar senha: ', error);
+      next(error);
+    }
+  }
 }

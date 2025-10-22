@@ -5,6 +5,8 @@ const PUBLIC_ROUTES = [
   '/api/auth/login',
   '/api/auth/signup',
   '/api/auth/refresh',
+  '/api/request-password-reset',
+  '/api/reset-password',
 ];
 
 export async function checkAuth(

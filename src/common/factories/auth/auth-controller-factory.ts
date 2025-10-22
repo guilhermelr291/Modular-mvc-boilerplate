@@ -19,7 +19,9 @@ export const makeAuthController = (): AuthController => {
     bcryptAdapter,
     bcryptAdapter,
     jwtAdapter,
-    new RefreshTokenGeneratorImpl()
+    new RefreshTokenGeneratorImpl(),
+    jwtAdapter,
+    jwtAdapter
   );
 
   const compareFieldsValidation = new FieldComparerValidation(

@@ -14,6 +14,19 @@ export class UserRepository {
     return user;
   }
 
+  async getById(id: number): Promise<User | null> {
+    const user = await prisma.user.findUnique({ where: { id } });
+    return user;
+  }
+
+  async update(id: number, data: Partial<User>): Promise<User> {
+    const user = await prisma.user.update({
+      where: { id },
+      data,
+    });
+    return user;
+  }
+
   async saveRefreshToken(refreshToken: string, userId: number) {
     await prisma.refreshToken.create({
       data: {

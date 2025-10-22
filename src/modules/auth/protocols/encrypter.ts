@@ -1,3 +1,3 @@
 export interface Encrypter {
-  encrypt(data: {}): string;
+  encrypt(data: {}, expiresIn?: string, secret?: string): string;
 }
