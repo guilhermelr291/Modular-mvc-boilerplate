@@ -29,6 +29,10 @@ const mockLoginParams = (): LoginParams => ({
 const mockRefreshAccessTokenParams = 'refresh_token';
 
 const mockRequestPasswordResetParams = 'any_email@mail.com';
+const mockResetPasswordParams: [string, string] = [
+  'reset_token',
+  'new_password',
+];
 
 const mockUserModel = (): User => ({
   id: 1,
@@ -39,6 +43,8 @@ const mockUserModel = (): User => ({
 
 const mockUserRepository = {
   getByEmail: vi.fn(),
+  getById: vi.fn().mockResolvedValue(mockUserModel()),
+  update: vi.fn(),
   create: vi.fn(),
   saveRefreshToken: vi.fn(),
   getRefreshTokenWithUser: vi.fn().mockResolvedValue({
@@ -78,7 +84,7 @@ class DecrypterStub implements Decrypter {
 }
 class DecoderStub implements Decoder {
   decode(token: string) {
-    return 'decoded_value';
+    return { id: 'decoded_id' };
   }
 }
 
@@ -439,6 +445,70 @@ describe('AuthService', () => {
 
       await expect(
         sut.requestPasswordReset(mockRequestPasswordResetParams)
+      ).rejects.toThrow();
+    });
+  });
+
+  describe('resetPassword', () => {
+    test('Should call Decoder.decode with correct value', async () => {
+      const decodeSpy = vi.spyOn(decoderStub, 'decode');
+      await sut.resetPassword(...mockResetPasswordParams);
+      expect(decodeSpy).toHaveBeenCalledWith(mockResetPasswordParams[0]);
+    });
+
+    test('Should call userRepository.getById with correct value', async () => {
+      const getByIdSpy = vi.spyOn(mockUserRepository, 'getById');
+      const decoded = decoderStub.decode(mockResetPasswordParams[0]);
+      await sut.resetPassword(...mockResetPasswordParams);
+      expect(getByIdSpy).toHaveBeenCalledWith(decoded.id);
+    });
+
+    test('Should throw NotFoundError if user is not found', async () => {
+      vi.spyOn(mockUserRepository, 'getById').mockResolvedValueOnce(null);
+      await expect(
+        sut.resetPassword(...mockResetPasswordParams)
+      ).rejects.toThrow(NotFoundError);
+    });
+
+    test('Should throw UnauthorizedError if Decoder.decode returns invalid data', async () => {
+      vi.spyOn(decoderStub, 'decode').mockReturnValueOnce(null);
+      await expect(
+        sut.resetPassword(...mockResetPasswordParams)
+      ).rejects.toThrow(UnauthorizedError);
+    });
+
+    test('Should call hasher.hash with correct value', async () => {
+      const hashSpy = vi.spyOn(hasherStub, 'hash');
+      await sut.resetPassword(...mockResetPasswordParams);
+      expect(hashSpy).toHaveBeenCalledWith(mockResetPasswordParams[1]);
+    });
+
+    test('Should call userRepository.update with correct values', async () => {
+      const updateSpy = vi.spyOn(mockUserRepository, 'update');
+      const user = await mockUserRepository.getById(1);
+      await sut.resetPassword(...mockResetPasswordParams);
+      expect(updateSpy).toHaveBeenCalledWith(user?.id, {
+        password: 'hashed_password',
+      });
+    });
+
+    test('Should call Decrypter.decrypt with correct values', async () => {
+      const decryptSpy = vi.spyOn(decrypterStub, 'decrypt');
+      const user = await mockUserRepository.getById(1);
+      const secret = process.env.JWT_SECRET! + user?.password;
+      await sut.resetPassword(...mockResetPasswordParams);
+      expect(decryptSpy).toHaveBeenCalledWith(
+        mockResetPasswordParams[0],
+        secret
+      );
+    });
+
+    test('Should throw if userRepository.getById throws', async () => {
+      vi.spyOn(mockUserRepository, 'getById').mockImplementationOnce(() => {
+        throw new Error();
+      });
+      await expect(
+        sut.resetPassword(...mockResetPasswordParams)
       ).rejects.toThrow();
     });
   });
