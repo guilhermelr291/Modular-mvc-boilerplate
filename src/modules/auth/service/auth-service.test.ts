@@ -4,7 +4,10 @@ import { UserRepository } from '../../user/repository/user-repository';
 import { AuthService, LoginParams, SignUpParams } from './auth-service';
 import { User } from '@prisma/client';
 
-import { UnauthorizedError } from '../../../common/errors/http-errors';
+import {
+  NotFoundError,
+  UnauthorizedError,
+} from '../../../common/errors/http-errors';
 import { Hasher } from '../protocols/hasher';
 import { HashComparer } from '../protocols/hash-comparer';
 import { Encrypter } from '../protocols/encrypter';
@@ -24,6 +27,8 @@ const mockLoginParams = (): LoginParams => ({
 });
 
 const mockRefreshAccessTokenParams = 'refresh_token';
+
+const mockRequestPasswordResetParams = 'any_email@mail.com';
 
 const mockUserModel = (): User => ({
   id: 1,
@@ -382,6 +387,59 @@ describe('AuthService', () => {
         accessToken: 'encrypted_value',
         refreshToken: 'refresh_token',
       });
+    });
+  });
+
+  describe('requestPasswordReset', () => {
+    test('Should call userRepository.getByEmail with correct value', async () => {
+      const getByEmailSpy = vi.spyOn(mockUserRepository, 'getByEmail');
+
+      await sut.requestPasswordReset(mockRequestPasswordResetParams);
+      expect(getByEmailSpy).toHaveBeenCalledWith(
+        mockRequestPasswordResetParams
+      );
+    });
+
+    test('Should throw NotFoundError if user is not found', async () => {
+      vi.spyOn(mockUserRepository, 'getByEmail').mockResolvedValueOnce(null);
+
+      await expect(
+        sut.requestPasswordReset(mockRequestPasswordResetParams)
+      ).rejects.toThrow(NotFoundError);
+    });
+
+    test('Should call Encrypter with correct values', async () => {
+      const encryptSpy = vi.spyOn(encrypterStub, 'encrypt');
+      const user = mockUserModel();
+      vi.spyOn(mockUserRepository, 'getByEmail').mockResolvedValueOnce(user);
+      const secret = process.env.JWT_SECRET + user.password;
+
+      await sut.requestPasswordReset(mockRequestPasswordResetParams);
+      expect(encryptSpy).toHaveBeenCalledWith(
+        { email: user.email, id: user.id },
+        process.env.RESET_PASSWORD_JWT_EXPIRE_IN,
+        secret
+      );
+    });
+
+    test('Should throw if userRepository.getByEmail throws', async () => {
+      vi.spyOn(mockUserRepository, 'getByEmail').mockImplementationOnce(() => {
+        throw new Error();
+      });
+
+      await expect(
+        sut.requestPasswordReset(mockRequestPasswordResetParams)
+      ).rejects.toThrow();
+    });
+
+    test('Should throw if Encrypter throws', async () => {
+      vi.spyOn(encrypterStub, 'encrypt').mockImplementationOnce(() => {
+        throw new Error();
+      });
+
+      await expect(
+        sut.requestPasswordReset(mockRequestPasswordResetParams)
+      ).rejects.toThrow();
     });
   });
 });
