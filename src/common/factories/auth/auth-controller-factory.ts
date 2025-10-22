@@ -4,6 +4,7 @@ import { AuthService } from '../../../modules/auth/service/auth-service';
 import { UserRepository } from '../../../modules/user/repository/user-repository';
 import { BcryptAdapter } from '../../adapters/cryptography/bcrypt-adapter';
 import { JwtAdapter } from '../../adapters/cryptography/jwt-adapter';
+import { RefreshTokenGeneratorImpl } from '../../utils/refresh-token-generator';
 import { FieldComparerValidation } from '../../validations/field-comparer';
 
 export const makeAuthController = (): AuthController => {
@@ -17,7 +18,8 @@ export const makeAuthController = (): AuthController => {
     userRepository,
     bcryptAdapter,
     bcryptAdapter,
-    jwtAdapter
+    jwtAdapter,
+    new RefreshTokenGeneratorImpl()
   );
 
   const compareFieldsValidation = new FieldComparerValidation(

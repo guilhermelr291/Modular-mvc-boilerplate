@@ -1,8 +1,11 @@
 import { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
-import prisma from '../../../prisma/db';
 
-const PUBLIC_ROUTES = ['/api/login', '/api/signup'];
+const PUBLIC_ROUTES = [
+  '/api/auth/login',
+  '/api/auth/signup',
+  '/api/auth/refresh',
+];
 
 export async function checkAuth(
   req: Request,
@@ -37,12 +40,6 @@ export async function checkAuth(
     };
 
     const userId = Number(payload.id);
-
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) {
-      res.status(401).json({ message: 'Usuário não encontrado' });
-      return;
-    }
 
     req.userId = userId;
 

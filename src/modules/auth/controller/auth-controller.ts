@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from 'express';
 import { AuthService } from '../service/auth-service';
 import { FieldComparer } from '../protocols/fields-comparer';
 import { User } from '@prisma/client';
+import { BadRequestError } from '../../../common/errors/http-errors';
 
 export class AuthController {
   constructor(
@@ -29,7 +30,7 @@ export class AuthController {
 
   async login(
     req: Request,
-    res: Response<{ token: string; user: User }>,
+    res: Response<{ accessToken: string; refreshToken: string; user: User }>,
     next: NextFunction
   ) {
     try {
@@ -38,6 +39,23 @@ export class AuthController {
       res.status(200).json(userAndToken);
     } catch (error) {
       console.log('Erro no login: ', error);
+      next(error);
+    }
+  }
+
+  async refreshAccessToken(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { refreshToken } = req.body;
+
+      if (!refreshToken) {
+        throw new BadRequestError('Refresh token not provided');
+      }
+
+      const tokens = await this.authService.refreshAccessToken(refreshToken);
+
+      res.status(200).json(tokens);
+    } catch (error) {
+      console.error('Error while refreshing access token: ', error);
       next(error);
     }
   }

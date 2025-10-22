@@ -9,6 +9,7 @@ import { UnauthorizedError } from '../../../common/errors/http-errors';
 import { Hasher } from '../protocols/hasher';
 import { HashComparer } from '../protocols/hash-comparer';
 import { Encrypter } from '../protocols/encrypter';
+import { RefreshTokenGenerator } from '../protocols/refresh-token-generator';
 
 const mockSignUpParams = (): SignUpParams => ({
   email: 'any_email@mail.com',
@@ -31,6 +32,10 @@ const mockUserModel = (): User => ({
 const mockUserRepository = {
   getByEmail: vi.fn(),
   create: vi.fn(),
+  saveRefreshToken: vi.fn(),
+  getRefreshTokenWithUser: vi.fn(),
+  deleteRefreshToken: vi.fn(),
+  revokeAllUserRefreshTokens: vi.fn(),
 } as unknown as UserRepository;
 
 class HasherStub implements Hasher {
@@ -51,11 +56,18 @@ class EncrypterStub implements Encrypter {
   }
 }
 
+class RefreshTokenGeneratorStub implements RefreshTokenGenerator {
+  generate(): string {
+    return 'another_encoded_value';
+  }
+}
+
 describe('AuthService', () => {
   let sut: AuthService;
   let hashComparerStub: HashComparer;
   let hasherStub: Hasher;
   let encrypterStub: Encrypter;
+  let refreshTokenGeneratorStub = new RefreshTokenGeneratorStub();
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -68,7 +80,8 @@ describe('AuthService', () => {
       mockUserRepository,
       hasherStub,
       hashComparerStub,
-      encrypterStub
+      encrypterStub,
+      refreshTokenGeneratorStub
     );
   });
 
@@ -181,11 +194,12 @@ describe('AuthService', () => {
       expect(encodeSpy).toHaveBeenCalledWith({ id: mockUserModel().id });
     });
 
-    test('Should return token and user on success', async () => {
+    test('Should return accessToken, refreshToken and user on success', async () => {
       const result = await sut.login(mockLoginParams());
 
       expect(result).toStrictEqual({
-        token: 'encoded_value',
+        accessToken: 'encoded_value',
+        refreshToken: 'another_encoded_value',
         user: {
           id: 1,
           email: 'any_email',

@@ -1,13 +1,13 @@
 services:
-  api-test:
+  postgres:
     image: bitnami/postgresql
     ports:
       - '5432:5432'
     env_file:
       - .env
     volumes:
-      - postgres_data:/bitnami/postgresql
+      - project_name_postgres_data:/bitnami/postgresql
 
 volumes:
-  postgres_data:
+  project_name_postgres_data:
     driver: local
